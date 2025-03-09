@@ -1,6 +1,8 @@
 ﻿@page "/"
+@rendermode InteractiveServer
 @using SageSupervisor.Models.DTO
 @inject IDbContextFactory<DataContext> contextFactory
+@inject ServiceBrokerService BrokerService
 
 <PageTitle>Superviseur Sage</PageTitle>
 
@@ -32,6 +34,8 @@
     protected override async Task OnInitializedAsync()
     {
         await RefreshAsync();
+
+        BrokerService.TableChanged += OnTableChanged;
     }
 
     private string GetAlertClass(TableChangeType changeType)
@@ -58,5 +62,10 @@
     {
         var context = await contextFactory.CreateDbContextAsync();
         _notifications = (await context.TableChangeDtos.AsNoTracking().OrderByDescending(x => x.UpdatedDate).ToListAsync()).AsQueryable();
+    }
+
+    private async void OnTableChanged(object? sender, TableChangeEventArgs e)
+    {
+        await RefreshAsync();
     }
 }
