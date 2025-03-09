@@ -1,0 +1,62 @@
+﻿@page "/"
+@using SageSupervisor.Models.DTO
+@inject IDbContextFactory<DataContext> contextFactory
+
+<PageTitle>Superviseur Sage</PageTitle>
+
+<h3>Notifications de changements de base de données</h3>
+
+<FluentDataGrid Items="@_notifications">
+    <ChildContent>
+        <PropertyColumn Property="@(n => n.ChangeType)" Title="Action" />
+        <PropertyColumn Property="@(n => n.NumPiece)" Title="N° de Pièce" />
+        <PropertyColumn Property="@(n => n.UpdatedDate.ToString("dd/MM/yyyy HH:mm:ss"))" Title="Date" />
+        <TemplateColumn Title="">
+            <FluentButton Appearance="Appearance.Accent" @onclick="@(() => DismissNotificationAsync(context))">X</FluentButton>
+        </TemplateColumn>        
+    </ChildContent>
+    <EmptyContent>
+        Pas de données à afficher
+    </EmptyContent>
+    <LoadingContent>
+        <FluentStack Orientation="Orientation.Vertical" HorizontalAlignment="HorizontalAlignment.Center">
+            Chargement...<br />
+            <FluentProgress Width="240px" />
+        </FluentStack>
+    </LoadingContent>
+</FluentDataGrid>
+
+@code {
+    private IQueryable<TableChangeDto>? _notifications;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshAsync();
+    }
+
+    private string GetAlertClass(TableChangeType changeType)
+    {
+        return changeType switch
+        {
+            TableChangeType.Insert => "alert-success",
+            TableChangeType.Update => "alert-primary",
+            TableChangeType.Delete => "alert-danger",
+            _ => "alert-secondary"
+        };
+    }
+
+    private async Task DismissNotificationAsync(TableChangeDto notification)
+    {
+        var context = await contextFactory.CreateDbContextAsync();
+        context.TableChangeDtos.Remove(notification);
+        await context.SaveChangesAsync();
+
+        await RefreshAsync();
+    }
+
+    private async Task RefreshAsync()
+    {
+        var context = await contextFactory.CreateDbContextAsync();
+        _notifications = (await context.TableChangeDtos.AsNoTracking().OrderByDescending(x => x.UpdatedDate).ToListAsync()).AsQueryable();
+    }
+}

@@ -1,0 +1,14 @@
+/bin/*
+/obj/*
+/*.suo
+/*.user
+/*.userosscache
+/*.sln.docstates
+/*.vspscc
+/*.vssscc
+/*.vsdf
+/*.vscode
+/*.pidb
+/*.log
+/*.tmp
+/*.tmp_protected
