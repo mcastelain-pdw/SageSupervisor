@@ -1,6 +1,6 @@
 namespace SageSupervisor.Models;
 
-public class TableChangeEventArgs(string recordId, TableChangeType changeType, DateTime timestamp, int domaine, int type) : EventArgs
+public class DocChangeEventArgs(string recordId, TableChangeType changeType, DateTime timestamp, int domaine, int type) : EventArgs
 {
     public string RecordId { get; } = recordId;
     public TableChangeType ChangeType { get; } = changeType;

@@ -3,19 +3,42 @@
 @using SageSupervisor.Models.DTO
 @inject IDbContextFactory<DataContext> contextFactory
 @inject ServiceBrokerService BrokerService
+@inject IToastService ToastService
 
 <PageTitle>Superviseur Sage</PageTitle>
 
-<h3>Notifications de changements de base de données</h3>
+<h3>Notifications de changements dans les documents</h3>
 
-<FluentDataGrid Items="@_notifications">
+<FluentDataGrid Items="@_notificationsDoc" Virtualize="true">
     <ChildContent>
+        <PropertyColumn Property="@(n => n.UpdatedDate.ToString("dd/MM/yyyy HH:mm:ss"))" Title="Date" />
         <PropertyColumn Property="@(n => n.ChangeType)" Title="Action" />
         <PropertyColumn Property="@(n => n.NumPiece)" Title="N° de Pièce" />
+        <PropertyColumn Property="@(n => n.Domaine)" Title="Domaine" />
+        <PropertyColumn Property="@(n => n.Type)" Title="Type" />      
+    </ChildContent>
+    <EmptyContent>
+        Pas de données à afficher
+    </EmptyContent>
+    <LoadingContent>
+        <FluentStack Orientation="Orientation.Vertical" HorizontalAlignment="HorizontalAlignment.Center">
+            Chargement...<br />
+            <FluentProgress Width="240px" />
+        </FluentStack>
+    </LoadingContent>
+</FluentDataGrid>
+
+<br />
+<br />
+
+<h3>Notifications de changements dans les comptes tiers</h3>
+
+<FluentDataGrid Items="@_notificationsTiers" Virtualize="true">
+    <ChildContent>
         <PropertyColumn Property="@(n => n.UpdatedDate.ToString("dd/MM/yyyy HH:mm:ss"))" Title="Date" />
-        <TemplateColumn Title="">
-            <FluentButton Appearance="Appearance.Accent" @onclick="@(() => DismissNotificationAsync(context))">X</FluentButton>
-        </TemplateColumn>        
+        <PropertyColumn Property="@(n => n.ChangeType)" Title="Action" />
+        <PropertyColumn Property="@(n => n.NumTiers)" Title="N° de Tiers" />
+        <PropertyColumn Property="@(n => n.Type)" Title="Type" />      
     </ChildContent>
     <EmptyContent>
         Pas de données à afficher
@@ -29,43 +52,43 @@
 </FluentDataGrid>
 
 @code {
-    private IQueryable<TableChangeDto>? _notifications;
+    private IQueryable<DocumentChangeDto>? _notificationsDoc = Enumerable.Empty<DocumentChangeDto>().AsQueryable();
+    private List<DocumentChangeDto> _notificationsDocList = new List<DocumentChangeDto>();
+    private IQueryable<TiersChangeDto>? _notificationsTiers = Enumerable.Empty<TiersChangeDto>().AsQueryable();
+    private List<TiersChangeDto> _notificationsTiersList = new List<TiersChangeDto>(); 
 
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
-        await RefreshAsync();
-
-        BrokerService.TableChanged += OnTableChanged;
-    }
-
-    private string GetAlertClass(TableChangeType changeType)
-    {
-        return changeType switch
+        // Subscribe with InvokeAsync
+        BrokerService.DocTableChanged += (sender, e) =>
         {
-            TableChangeType.Insert => "alert-success",
-            TableChangeType.Update => "alert-primary",
-            TableChangeType.Delete => "alert-danger",
-            _ => "alert-secondary"
+            InvokeAsync(() => OnDocTableChanged(sender, e));
+        };
+        BrokerService.TiersTableChanged += (sender, e) =>
+        {
+            InvokeAsync(() => OnTiersTableChanged(sender, e));
         };
     }
 
-    private async Task DismissNotificationAsync(TableChangeDto notification)
+    private void OnDocTableChanged(object? sender, DocumentChangeDto e)
     {
-        var context = await contextFactory.CreateDbContextAsync();
-        context.TableChangeDtos.Remove(notification);
-        await context.SaveChangesAsync();
+        _notificationsDocList.Insert(0, e);
 
-        await RefreshAsync();
+        _notificationsDoc = _notificationsDocList.AsQueryable();
+
+        ToastService.ShowSuccess($"Changement détecté - Pièce: {e.NumPiece} ({e.ChangeType})");
+
+        StateHasChanged();
     }
-
-    private async Task RefreshAsync()
+    
+    private void OnTiersTableChanged(object? sender, TiersChangeDto e)
     {
-        var context = await contextFactory.CreateDbContextAsync();
-        _notifications = (await context.TableChangeDtos.AsNoTracking().OrderByDescending(x => x.UpdatedDate).ToListAsync()).AsQueryable();
-    }
+        _notificationsTiersList.Insert(0, e);
 
-    private async void OnTableChanged(object? sender, TableChangeEventArgs e)
-    {
-        await RefreshAsync();
+        _notificationsTiers = _notificationsTiersList.AsQueryable();
+
+        ToastService.ShowSuccess($"Changement détecté - Pièce: {e.NumTiers} ({e.ChangeType})");
+
+        StateHasChanged();
     }
 }

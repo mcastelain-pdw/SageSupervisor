@@ -3,12 +3,12 @@ using System.ComponentModel.DataAnnotations;
 
 namespace SageSupervisor.Models.DTO;
 
-public class TableChangeDto()
+public class TiersChangeDto
 {
     public int Id { get; set; }
 
     [Required]
-    public string NumPiece { get; set; } = "";
+    public string NumTiers { get; set; } = "";
 
     [Required]
     public TableChangeType ChangeType { get; set; }
@@ -17,8 +17,13 @@ public class TableChangeDto()
     public DateTime UpdatedDate { get; set; }
 
     [DefaultValue(0)]
-    public int Domaine { get; set; }
+    public TiersTypeEnum Type { get; set; }
+}
 
-    [DefaultValue(0)]
-    public int Type { get; set; }
+public enum TiersTypeEnum
+{
+    Client = 0,
+    Fournisseur = 1,
+    Salarie = 2,
+    autres = 3
 }

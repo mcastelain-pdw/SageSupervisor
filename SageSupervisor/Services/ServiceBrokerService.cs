@@ -9,16 +9,19 @@ namespace SageSupervisor.Services
     public class ServiceBrokerService(
         ILogger<ServiceBrokerService> logger, 
         IConfiguration configuration,
-        IDbContextFactory<DataContext> contextFactory) : BackgroundService
+        IDbContextFactory<DataContext> contextFactory,
+        ServiceBrokerMonitor monitor) : BackgroundService
     {
         private readonly ILogger<ServiceBrokerService> _logger = logger;
         private readonly IConfiguration _configuration = configuration;
-        private ServiceBrokerMonitor? _monitor;
-        private readonly ConcurrentQueue<TableChangeEventArgs> _notificationQueue = new();
+        private ServiceBrokerMonitor? _monitor = monitor;
+        private readonly ConcurrentQueue<DocChangeEventArgs> _notificationDocQueue = new();
+        private readonly ConcurrentQueue<TiersChangeEventArgs> _notificationTiersQueue = new();
         private readonly IDbContextFactory<DataContext> _contextFactory = contextFactory;
         
         // Événement que les composants Blazor peuvent écouter
-        public event EventHandler<TableChangeEventArgs>? TableChanged;
+        public event EventHandler<DocumentChangeDto>? DocTableChanged;
+        public event EventHandler<TiersChangeDto>? TiersTableChanged;
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
@@ -26,14 +29,9 @@ namespace SageSupervisor.Services
 
             try
             {
-                // Récupérer la chaîne de connexion depuis la configuration
-                string connectionString = _configuration.GetConnectionString("DefaultConnection") ?? "";
-                
-                // Initialiser le moniteur Service Broker
-                _monitor = new ServiceBrokerMonitor(connectionString);
-                
-                // S'abonner aux événements de changement
-                _monitor.TableChanged += OnTableChanged!;
+                // S'abonner aux événements de changement de document
+                _monitor!.DocTableChanged += OnDocTableChanged!;
+                _monitor!.TiersTableChanged += OnTiersTableChanged!;
                 
                 // Démarrer la surveillance
                 _monitor.Start();
@@ -56,7 +54,7 @@ namespace SageSupervisor.Services
                 // Nettoyage
                 if (_monitor != null)
                 {
-                    _monitor.TableChanged -= OnTableChanged!;
+                    _monitor.DocTableChanged -= OnDocTableChanged!;
                     _monitor.Stop();
                     _monitor.Dispose();
                 }
@@ -65,21 +63,55 @@ namespace SageSupervisor.Services
             }
         }
         
-        private void OnTableChanged(object sender, TableChangeEventArgs e)
+        private void OnDocTableChanged(object sender, DocChangeEventArgs e)
         {
-            // Mettre la notification dans une file d'attente pour traitement
-            _notificationQueue.Enqueue(e);
-            _logger.LogInformation($"Modification détectée: ID={e.RecordId}, Type={e.ChangeType}");
-
-            // Ajout en BDD
             using var cn = _contextFactory.CreateDbContext();
-            cn.TableChangeDtos.Add(new TableChangeDto
+            _logger.LogInformation($"Evènement détecté: ID={e.RecordId}, Type={e.ChangeType}");
+
+            // Test si message à traiter
+            if (cn.DocumentChangeDtos.Where(t => t.NumPiece == e.RecordId).Any())
+            {
+                _logger.LogInformation($"Evènement ignoré: ID {e.RecordId} déjà en attente de traitement");
+                return;
+            }
+
+            // Mettre la notification dans une file d'attente pour traitement
+            _notificationDocQueue.Enqueue(e);
+            
+            // Ajout en BDD
+            cn.DocumentChangeDtos.Add(new DocumentChangeDto
             {
                 NumPiece = e.RecordId,
                 ChangeType = e.ChangeType,
                 UpdatedDate = e.Timestamp,
-                Domaine = e.Domaine,
-                Type = e.Type
+                Domaine = (DocDomaineEnum)e.Domaine,
+                Type = (DocTypeEnum)e.Type
+            });
+            cn.SaveChanges();
+        }
+
+        private void OnTiersTableChanged(object sender, TiersChangeEventArgs e)
+        {
+            using var cn = _contextFactory.CreateDbContext();
+            _logger.LogInformation($"Evènement détecté: ID={e.RecordId}, Type={e.ChangeType}");
+
+            // Test si message à traiter
+            if (cn.TiersChangeDtos.Where(t => t.NumTiers == e.RecordId).Any())
+            {
+                _logger.LogInformation($"Evènement ignoré: ID {e.RecordId} déjà en attente de traitement");
+                return;
+            }
+
+            // Mettre la notification dans une file d'attente pour traitement
+            _notificationTiersQueue.Enqueue(e);
+            
+            // Ajout en BDD
+            cn.TiersChangeDtos.Add(new TiersChangeDto
+            {
+                NumTiers = e.RecordId,
+                ChangeType = e.ChangeType,
+                UpdatedDate = e.Timestamp,
+                Type = (TiersTypeEnum)e.Type
             });
             cn.SaveChanges();
         }
@@ -87,17 +119,30 @@ namespace SageSupervisor.Services
         private void ProcessNotificationQueue()
         {
             // Traiter toutes les notifications en attente
-            while (_notificationQueue.TryDequeue(out var notification))
+            while (_notificationDocQueue.TryDequeue(out var notification))
             {
                 // Déclencher l'événement que les composants Blazor peuvent écouter
-                TableChanged?.Invoke(this, notification);
+                DocTableChanged?.Invoke(this, new DocumentChangeDto
+                {
+                    NumPiece = notification.RecordId,
+                    ChangeType = notification.ChangeType,
+                    UpdatedDate = notification.Timestamp,
+                    Domaine = (DocDomaineEnum)notification.Domaine,
+                    Type = (DocTypeEnum)notification.Type
+                });
             }
-        }
-        
-        // Méthode pour obtenir explicitement les dernières modifications
-        public async Task<TableChangeEventArgs[]> GetRecentChangesAsync()
-        {
-            return await Task.FromResult<TableChangeEventArgs[]>([.. _notificationQueue]);
+
+            while (_notificationTiersQueue.TryDequeue(out var notification))
+            {
+                // Déclencher l'événement que les composants Blazor peuvent écouter
+                TiersTableChanged?.Invoke(this, new TiersChangeDto
+                {
+                    NumTiers = notification.RecordId,
+                    ChangeType = notification.ChangeType,
+                    UpdatedDate = notification.Timestamp,
+                    Type = (TiersTypeEnum)notification.Type
+                });
+            }
         }
     }
 }

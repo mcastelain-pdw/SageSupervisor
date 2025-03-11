@@ -9,9 +9,10 @@ public class ServiceBrokerMonitor(string connectionString) : IDisposable
     private SqlConnection? _connection;
     private CancellationTokenSource? _cancellationTokenSource;
     private Task? _monitoringTask;
-    private TableChangeEventArgs? checkDoubleValueMemory;
+    private DocChangeEventArgs? checkDoubleValueMemory;
     
-    public event EventHandler<TableChangeEventArgs>? TableChanged;
+    public event EventHandler<DocChangeEventArgs>? DocTableChanged;
+    public event EventHandler<TiersChangeEventArgs>? TiersTableChanged;
 
     public void Start()
     {
@@ -90,7 +91,7 @@ public class ServiceBrokerMonitor(string connectionString) : IDisposable
                         if (!reader.IsDBNull(1))
                         {
                             string messageBody = reader.GetString(1);
-                            ProcessMessage(messageBody);
+                            await ProcessMessageAsync(messageBody);
                         }
                     }
                 }
@@ -115,7 +116,7 @@ public class ServiceBrokerMonitor(string connectionString) : IDisposable
         }
     }
 
-    private void ProcessMessage(string messageBody)
+    private async Task ProcessMessageAsync(string messageBody)
     {
         try
         {
@@ -124,53 +125,104 @@ public class ServiceBrokerMonitor(string connectionString) : IDisposable
                 return;
 
             XElement rootElement = xmlDoc.Root;
-            
-            if (rootElement.Name == "F_DOCENTETE")
-            {
-                foreach (XElement modificationElement in rootElement.Elements())
-                {
-                    string operationType = modificationElement.Attribute("OperationType")!.Value;
-                    string recordID = modificationElement.Attribute("RecordID")!.Value;
-                    string modificationTime = modificationElement.Attribute("ModificationTime")!.Value;
-                    int domaine = int.Parse(modificationElement.Attribute("Domaine")!.Value);
-                    int type = int.Parse(modificationElement.Attribute("Type")!.Value);
-                    
-                    if (!string.IsNullOrEmpty(operationType) 
-                        && !string.IsNullOrEmpty(recordID)
-                        && domaine == 0 
-                        && type == 0)
-                    {
-                        DateTime timeStamp = DateTime.Parse(modificationTime);
-                        
-                        // Convertir le type d'opération en enum
-                        TableChangeType changeType = operationType switch
-                        {
-                            "INSERT" => TableChangeType.Insert,
-                            "UPDATE" => TableChangeType.Update,
-                            "DELETE" => TableChangeType.Delete,
-                            _ => TableChangeType.Unknown
-                        };
 
-                        // Test doublon
-                        if (checkDoubleValueMemory is not null)
-                        {
-                            if (checkDoubleValueMemory.RecordId == recordID
-                            && checkDoubleValueMemory.ChangeType == changeType
-                            && checkDoubleValueMemory.Timestamp > timeStamp.AddSeconds(-5))
-                            continue;
-                        }
-                        checkDoubleValueMemory = new TableChangeEventArgs(recordID, changeType, timeStamp, domaine, type);
-                        
-                        // Déclencher l'événement
-                        TableChanged?.Invoke(this, new TableChangeEventArgs(recordID, changeType, timeStamp, domaine, type));
-                    }
-                }
+            switch (rootElement.Name.LocalName)
+            {
+                case "F_DOCENTETE":
+                    await DocumentProcessAsync(rootElement);
+                    break;
+                case "F_COMPTET":
+                    await TiersProcessAsync(rootElement);
+                    break;
             }
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Erreur lors du traitement du message: {ex.Message}");
         }
+    }
+
+    public async Task DocumentProcessAsync(XElement rootElement)
+    {
+        await Task.Run(() => 
+        {
+            foreach (XElement modificationElement in rootElement.Elements())
+            {
+                string operationType = modificationElement.Attribute("OperationType")!.Value;
+                string recordID = modificationElement.Attribute("RecordID")!.Value;
+                string modificationTime = modificationElement.Attribute("ModificationTime")!.Value;
+                int domaine = int.Parse(modificationElement.Attribute("Domaine")!.Value);
+                int type = int.Parse(modificationElement.Attribute("Type")!.Value);
+                
+                if (!string.IsNullOrEmpty(operationType) 
+                    && !string.IsNullOrEmpty(recordID))
+                {
+                    DateTime timeStamp = DateTime.Parse(modificationTime);
+                    
+                    // Convertir le type d'opération en enum
+                    TableChangeType changeType = operationType switch
+                    {
+                        "INSERT" => TableChangeType.Insert,
+                        "UPDATE" => TableChangeType.Update,
+                        "DELETE" => TableChangeType.Delete,
+                        _ => TableChangeType.Unknown
+                    };
+
+                    // Test doublon
+                    if (checkDoubleValueMemory is not null)
+                    {
+                        if (checkDoubleValueMemory.RecordId == recordID
+                        && checkDoubleValueMemory.Timestamp > timeStamp.AddSeconds(-5))
+                        continue;
+                    }
+                    checkDoubleValueMemory = new DocChangeEventArgs(recordID, changeType, timeStamp, domaine, type);
+                    
+                    // Déclencher l'événement
+                    DocTableChanged?.Invoke(this, new DocChangeEventArgs(recordID, changeType, timeStamp, domaine, type));
+                }
+            }
+        });
+    }
+
+    public async Task TiersProcessAsync(XElement rootElement)
+    {
+        await Task.Run(() => 
+        {
+            foreach (XElement modificationElement in rootElement.Elements())
+            {
+                string operationType = modificationElement.Attribute("OperationType")!.Value;
+                string recordID = modificationElement.Attribute("RecordID")!.Value;
+                string modificationTime = modificationElement.Attribute("ModificationTime")!.Value;
+                int type = int.Parse(modificationElement.Attribute("Type")!.Value);
+                
+                if (!string.IsNullOrEmpty(operationType) 
+                    && !string.IsNullOrEmpty(recordID))
+                {
+                    DateTime timeStamp = DateTime.Parse(modificationTime);
+                    
+                    // Convertir le type d'opération en enum
+                    TableChangeType changeType = operationType switch
+                    {
+                        "INSERT" => TableChangeType.Insert,
+                        "UPDATE" => TableChangeType.Update,
+                        "DELETE" => TableChangeType.Delete,
+                        _ => TableChangeType.Unknown
+                    };
+
+                    // Test doublon
+                    //if (checkDoubleValueMemory is not null)
+                    //{
+                    //    if (checkDoubleValueMemory.RecordId == recordID
+                    //    && checkDoubleValueMemory.Timestamp > timeStamp.AddSeconds(-5))
+                    //    continue;
+                    //}
+                    //checkDoubleValueMemory = new TiersChangeEventArgs(recordID, changeType, timeStamp, type);
+                    
+                    // Déclencher l'événement
+                    TiersTableChanged?.Invoke(this, new TiersChangeEventArgs(recordID, changeType, timeStamp, type));
+                }
+            }
+        });
     }
 
     public void Dispose()

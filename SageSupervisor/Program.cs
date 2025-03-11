@@ -15,8 +15,10 @@ builder.Services.AddFluentUIComponents();
 builder.Services.AddDbContextFactory<DataContext>(opt => 
     opt.UseSqlServer(builder.Configuration.GetConnectionString("ProdwareConnection"))
     .EnableSensitiveDataLogging());
+builder.Services.AddSingleton<ServiceBrokerMonitor>(new ServiceBrokerMonitor(builder.Configuration.GetConnectionString("DefaultConnection")!));
 builder.Services.AddSingleton<ServiceBrokerService>();
 builder.Services.AddHostedService(provider => provider.GetRequiredService<ServiceBrokerService>());
+builder.Services.AddDataGridEntityFrameworkAdapter();
 
 var app = builder.Build();
 

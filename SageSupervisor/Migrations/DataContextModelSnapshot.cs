@@ -22,7 +22,7 @@ namespace SageSupervisor.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("SageSupervisor.Models.DTO.TableChangeDto", b =>
+            modelBuilder.Entity("SageSupervisor.Models.DTO.DocumentChangeDto", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -48,7 +48,33 @@ namespace SageSupervisor.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("TableChangeDtos");
+                    b.ToTable("DocumentChangeDtos");
+                });
+
+            modelBuilder.Entity("SageSupervisor.Models.DTO.TiersChangeDto", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ChangeType")
+                        .HasColumnType("int");
+
+                    b.Property<string>("NumTiers")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("TiersChangeDtos");
                 });
 #pragma warning restore 612, 618
         }

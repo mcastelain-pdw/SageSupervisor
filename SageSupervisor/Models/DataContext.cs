@@ -5,7 +5,8 @@ namespace SageSupervisor.Models;
 
 public class DataContext(DbContextOptions<DataContext> options) : DbContext(options)
 {
-    public DbSet<TableChangeDto> TableChangeDtos { get; set; }
+    public DbSet<DocumentChangeDto> DocumentChangeDtos { get; set; }
+    public DbSet<TiersChangeDto> TiersChangeDtos { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -6,13 +6,13 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace SageSupervisor.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialCreate : Migration
+    public partial class InitCreate : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
-                name: "TableChangeDtos",
+                name: "DocumentChangeDtos",
                 columns: table => new
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
@@ -25,7 +25,23 @@ namespace SageSupervisor.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_TableChangeDtos", x => x.Id);
+                    table.PrimaryKey("PK_DocumentChangeDtos", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "TiersChangeDtos",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    NumTiers = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    ChangeType = table.Column<int>(type: "int", nullable: false),
+                    UpdatedDate = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    Type = table.Column<int>(type: "int", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_TiersChangeDtos", x => x.Id);
                 });
         }
 
@@ -33,7 +49,10 @@ namespace SageSupervisor.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
-                name: "TableChangeDtos");
+                name: "DocumentChangeDtos");
+
+            migrationBuilder.DropTable(
+                name: "TiersChangeDtos");
         }
     }
 }
