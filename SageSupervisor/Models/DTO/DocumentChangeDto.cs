@@ -16,6 +16,10 @@ public class DocumentChangeDto()
     [Required]
     public DateTime UpdatedDate { get; set; }
 
+    [Required]
+    [DefaultValue(0)]
+    public decimal TotalHT { get; set; }
+
     [DefaultValue(0)]
     public DocDomaineEnum Domaine { get; set; }
 

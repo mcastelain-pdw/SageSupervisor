@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Xml.Linq;
 using Microsoft.Data.SqlClient;
 
@@ -153,6 +154,7 @@ public class ServiceBrokerMonitor(string connectionString) : IDisposable
                 string modificationTime = modificationElement.Attribute("ModificationTime")!.Value;
                 int domaine = int.Parse(modificationElement.Attribute("Domaine")!.Value);
                 int type = int.Parse(modificationElement.Attribute("Type")!.Value);
+                decimal total = decimal.Parse(modificationElement.Attribute("TotalHT")!.Value, CultureInfo.GetCultureInfo("en-US"));
                 
                 if (!string.IsNullOrEmpty(operationType) 
                     && !string.IsNullOrEmpty(recordID))
@@ -172,13 +174,13 @@ public class ServiceBrokerMonitor(string connectionString) : IDisposable
                     if (checkDoubleValueMemory is not null)
                     {
                         if (checkDoubleValueMemory.RecordId == recordID
-                        && checkDoubleValueMemory.Timestamp > timeStamp.AddSeconds(-5))
+                        && checkDoubleValueMemory.Timestamp > timeStamp.AddSeconds(-2))
                         continue;
                     }
-                    checkDoubleValueMemory = new DocChangeEventArgs(recordID, changeType, timeStamp, domaine, type);
+                    checkDoubleValueMemory = new DocChangeEventArgs(recordID, changeType, timeStamp, domaine, type, total);
                     
                     // Déclencher l'événement
-                    DocTableChanged?.Invoke(this, new DocChangeEventArgs(recordID, changeType, timeStamp, domaine, type));
+                    DocTableChanged?.Invoke(this, new DocChangeEventArgs(recordID, changeType, timeStamp, domaine, type, total));
                 }
             }
         });

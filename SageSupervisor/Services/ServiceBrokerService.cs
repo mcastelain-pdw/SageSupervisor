@@ -69,9 +69,14 @@ namespace SageSupervisor.Services
             _logger.LogInformation($"Evènement détecté: ID={e.RecordId}, Type={e.ChangeType}");
 
             // Test si message à traiter
-            if (cn.DocumentChangeDtos.Where(t => t.NumPiece == e.RecordId).Any())
+            if (cn.DocumentChangeDtos.Where(t => t.NumPiece == e.RecordId && t.TotalHT != e.TotalHT).Any())
             {
                 _logger.LogInformation($"Evènement ignoré: ID {e.RecordId} déjà en attente de traitement");
+                return;
+            }
+            if (e.TotalHT == 0)
+            {
+                _logger.LogInformation($"Evènement ignoré: ID {e.RecordId} avec TotalHT=0");
                 return;
             }
 
@@ -84,6 +89,7 @@ namespace SageSupervisor.Services
                 NumPiece = e.RecordId,
                 ChangeType = e.ChangeType,
                 UpdatedDate = e.Timestamp,
+                TotalHT = e.TotalHT,
                 Domaine = (DocDomaineEnum)e.Domaine,
                 Type = (DocTypeEnum)e.Type
             });
@@ -127,6 +133,7 @@ namespace SageSupervisor.Services
                     NumPiece = notification.RecordId,
                     ChangeType = notification.ChangeType,
                     UpdatedDate = notification.Timestamp,
+                    TotalHT = notification.TotalHT,
                     Domaine = (DocDomaineEnum)notification.Domaine,
                     Type = (DocTypeEnum)notification.Type
                 });
